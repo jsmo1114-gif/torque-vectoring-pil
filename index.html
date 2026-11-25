@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arduino Due PIL 기반 4륜 독립 구동 토크 벡터링 제어</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --card: #ffffff;
+      --text: #181b20;
+      --sub: #525866;
+      --border: #e1e5ec;
+      --blue: #006be0;
+      --blue-bg: #eef5ff;
+      --red: #e02424;
+      --red-bg: #fef2f2;
+      --green: #0a853d;
+      --green-bg: #ecfdf3;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+    }
+
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 36px 20px 64px;
+    }
+
+    /* 상단 헤더 */
+    header {
+      background: linear-gradient(135deg, #141923 0%, #232d3f 100%);
+      color: #ffffff;
+      padding: 48px 20px;
+      text-align: center;
+      border-bottom: 4px solid var(--red);
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #f0f4f8;
+      font-size: 0.84rem;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 999px;
+      margin-bottom: 14px;
+      letter-spacing: 0.03em;
+    }
+
+    header h1 {
+      font-size: clamp(1.55rem, 3.2vw, 2.25rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+
+    header p.subtitle {
+      color: #cbd5e1;
+      font-size: 1.02rem;
+      max-width: 720px;
+      margin: 0 auto 18px;
+    }
+
+    .meta-info {
+      font-size: 0.9rem;
+      color: #94a3b8;
+    }
+
+    /* 핵심 수치 KPI 카드 */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 18px;
+      margin-top: -28px;
+      margin-bottom: 32px;
+    }
+
+    .kpi-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 24px;
+      box-shadow: 0 6px 18px rgba(16, 24, 40, 0.06);
+    }
+
+    .kpi-label {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--sub);
+      margin-bottom: 6px;
+    }
+
+    .kpi-value {
+      font-size: 1.95rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .kpi-sub {
+      font-size: 0.84rem;
+      color: var(--sub);
+      margin-top: 4px;
+    }
+
+    .kpi-off { border-top: 4px solid var(--blue); }
+    .kpi-off .kpi-value { color: var(--blue); }
+
+    .kpi-on { border-top: 4px solid var(--red); }
+    .kpi-on .kpi-value { color: var(--red); }
+
+    .kpi-gain { border-top: 4px solid var(--green); background: var(--green-bg); }
+    .kpi-gain .kpi-value { color: var(--green); }
+
+    /* 공통 섹션 카드 */
+    section.card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 26px;
+      box-shadow: 0 2px 10px rgba(16, 24, 40, 0.03);
+    }
+
+    section.card h2 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    section.card p.sec-desc {
+      color: var(--sub);
+      font-size: 0.94rem;
+      margin-bottom: 20px;
+    }
+
+    /* 비디오 컨테이너 */
+    .video-wrap {
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #0f172a;
+    }
+
+    video {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .panel-guide {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .guide-item {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 0.88rem;
+    }
+
+    .guide-item strong {
+      display: block;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+
+    /* PIL 구조도 SVG */
+    .arch-box {
+      width: 100%;
+      overflow-x: auto;
+      padding: 10px 0;
+    }
+
+    /* 2단 그리드 (제원 및 성능 비교표) */
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 22px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.93rem;
+    }
+
+    th, td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: #f8fafc;
+      font-weight: 700;
+      color: var(--sub);
+    }
+
+    .tag-blue {
+      display: inline-block;
+      background: var(--blue-bg);
+      color: var(--blue);
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .tag-red {
+      display: inline-block;
+      background: var(--red-bg);
+      color: var(--red);
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .tag-green {
+      display: inline-block;
+      background: var(--green-bg);
+      color: var(--green);
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    ul.summary-list {
+      padding-left: 18px;
+      color: var(--text);
+      font-size: 0.94rem;
+    }
+
+    ul.summary-list li {
+      margin-bottom: 10px;
+    }
+
+    footer {
+      text-align: center;
+      color: var(--sub);
+      font-size: 0.86rem;
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="badge">MATLAB / Simulink &amp; Arduino Due PIL Verification</div>
+    <h1>Arduino Due PIL 기반 4륜 독립 구동 토크 벡터링 제어</h1>
+    <p class="subtitle">
+      실시간 임베디드 타겟(ARM Cortex-M3) 연동을 통한 직접 요 모멘트 제어(DYC) 및 코너링 주행 안정성 검증
+    </p>
+    <!-- 아래 이름/소속을 본인 정보로 수정하세요 -->
+    <div class="meta-info">작성자: 조성모 &nbsp;|&nbsp; 소속: 인천대학교 전자공학과</div>
+  </header>
+
+  <div class="container">
+
+    <!-- 핵심 수치 요약 카드 -->
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-off">
+        <div class="kpi-label">TV OFF (미제어) 요레이트 RMSE</div>
+        <div class="kpi-value">0.4932 <span style="font-size:1rem;">rad/s</span></div>
+        <div class="kpi-sub">4륜 균등 구동 토크 분배 조건</div>
+      </div>
+      <div class="kpi-card kpi-on">
+        <div class="kpi-label">TV ON (Arduino PIL) 요레이트 RMSE</div>
+        <div class="kpi-value">0.1397 <span style="font-size:1rem;">rad/s</span></div>
+        <div class="kpi-sub">실시간 비대칭 4륜 토크 벡터링 적용</div>
+      </div>
+      <div class="kpi-card kpi-gain">
+        <div class="kpi-label">요레이트 추종 오차(RMSE) 감소율</div>
+        <div class="kpi-value">-71.7%</div>
+        <div class="kpi-sub">오차 0.3535 rad/s 감소 (목표 궤적 추종 향상)</div>
+      </div>
+    </div>
+
+    <!-- 1. 시뮬레이션 데모 영상 -->
+    <section class="card">
+      <h2>1. 4륜 독립 구동 토크 벡터링 시뮬레이션 결과 영상 (2.0x)</h2>
+      <p class="sec-desc">
+        동일한 연속 선회 트랙 주행 조건에서 <strong>TV OFF(파란색)</strong>와 <strong>TV ON - Arduino Due PIL(빨간색)</strong>의 주행 경로, 4륜 토크 분배, 요레이트 추종 성능을 동시에 비교한 결과입니다.
+      </p>
+
+      <div class="video-wrap">
+        <video controls playsinline preload="metadata">
+          <source src="TV_CleanLayout_2xSpeed.mp4" type="video/mp4" />
+          브라우저가 HTML5 비디오 재생을 지원하지 않습니다.
+        </video>
+      </div>
+
+      <div class="panel-guide">
+        <div class="guide-item">
+          <strong>① 2D 전체 트랙 비교 (좌측)</strong>
+          전체 주행 코스에서 TV OFF 차량의 코너 바깥쪽 이탈과 TV ON 차량의 목표 중심선 추종을 비교합니다.
+        </div>
+        <div class="guide-item">
+          <strong>② 3D 코너 확대 뷰 (중좌측)</strong>
+          차선 폭(5.4 m) 기준 코너 진입·탈출 시 두 차량의 자세각 및 주행 궤적 차이를 입체적으로 보여줍니다.
+        </div>
+        <div class="guide-item">
+          <strong>③ 4륜 토크 분배 (중우측)</strong>
+          선회 방향에 따라 좌·우측 휠(FL, FR, RL, RR)에 차등 인가되는 구동 토크와 제어 요 모멘트(Mz)를 표시합니다.
+        </div>
+        <div class="guide-item">
+          <strong>④ 실시간 추종 그래프 (하단)</strong>
+          Target Yaw Rate 대비 TV OFF 및 Arduino PIL 기반 TV ON의 시간 영역 요레이트 응답을 나타냅니다.
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. PIL 시스템 아키텍처 -->
+    <section class="card">
+      <h2>2. Arduino Due PIL (Processor-in-the-Loop) 연동 구조</h2>
+      <p class="sec-desc">
+        단순 PC 시뮬레이션을 넘어, 실제 제어기 코드가 탑재된 <strong>Arduino Due (32-bit ARM Cortex-M3, 84 MHz)</strong> 보드와 Host PC의 차량 동역학 모델이 실시간 직렬 통신으로 폐루프(Closed-Loop)를 구성하여 연산 정밀도와 제어 응답성을 검증했습니다.
+      </p>
+
+      <div class="arch-box">
+        <svg viewBox="0 0 920 220" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+          <!-- Host PC Box -->
+          <rect x="20" y="20" width="370" height="180" rx="14" fill="#f8fafc" stroke="#006be0" stroke-width="2.2"/>
+          <text x="205" y="48" text-anchor="middle" font-size="14" font-weight="800" fill="#006be0">HOST PC (MATLAB / Simulink)</text>
+          <rect x="45" y="68" width="320" height="48" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+          <text x="205" y="96" text-anchor="middle" font-size="13" font-weight="700" fill="#181b20">목표 요레이트 생성기 (Reference Yaw Rate)</text>
+          <rect x="45" y="130" width="320" height="52" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+          <text x="205" y="160" text-anchor="middle" font-size="13" font-weight="700" fill="#181b20">4WD 차량 동역학 플랜트 모델 (Vehicle Plant)</text>
+
+          <!-- Arrows -->
+          <line x1="390" y1="88" x2="520" y2="88" stroke="#181b20" stroke-width="2.2"/>
+          <polygon points="520,88 510,82 510,94" fill="#181b20"/>
+          <text x="455" y="76" text-anchor="middle" font-size="11.5" font-weight="700" fill="#181b20">Target &amp; Actual Yaw Rate</text>
+
+          <line x1="520" y1="154" x2="390" y2="154" stroke="#e02424" stroke-width="2.2"/>
+          <polygon points="390,154 400,148 400,160" fill="#e02424"/>
+          <text x="455" y="142" text-anchor="middle" font-size="11.5" font-weight="700" fill="#e02424">4-Wheel Torque (FL,FR,RL,RR)</text>
+          <text x="455" y="176" text-anchor="middle" font-size="11" fill="#525866">USB / Serial PIL Interface</text>
+
+          <!-- Target MCU Box -->
+          <rect x="525" y="20" width="375" height="180" rx="14" fill="#fef2f2" stroke="#e02424" stroke-width="2.2"/>
+          <text x="712" y="48" text-anchor="middle" font-size="14" font-weight="800" fill="#e02424">TARGET MCU (Arduino Due PIL)</text>
+          <rect x="550" y="68" width="325" height="48" rx="8" fill="#ffffff" stroke="#fecaca" stroke-width="1.5"/>
+          <text x="712" y="96" text-anchor="middle" font-size="13" font-weight="700" fill="#181b20">상위 제어기: 필요 요 모멘트 (Mz) 연산</text>
+          <rect x="550" y="130" width="325" height="52" rx="8" fill="#ffffff" stroke="#fecaca" stroke-width="1.5"/>
+          <text x="712" y="160" text-anchor="middle" font-size="13" font-weight="700" fill="#181b20">하위 분배기: 4륜 독립 구동 토크 배분</text>
+        </svg>
+      </div>
+    </section>
+
+    <!-- 3. 정량적 비교 및 결론 -->
+    <div class="two-col">
+      <section class="card">
+        <h2>3. 정량적 성능 비교표</h2>
+        <p class="sec-desc">동일 조향 입력 및 주행 속도(54 km/h) 기준 성능 지표</p>
+        <table>
+          <thead>
+            <tr>
+              <th>평가 항목</th>
+              <th>TV OFF</th>
+              <th>TV ON (PIL)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>구동 토크 방식</strong></td>
+              <td><span class="tag-blue">4륜 균등 배분</span></td>
+              <td><span class="tag-red">좌·우 비대칭 제어</span></td>
+            </tr>
+            <tr>
+              <td><strong>요레이트 RMSE</strong></td>
+              <td>0.4932 rad/s</td>
+              <td><strong>0.1397 rad/s</strong></td>
+            </tr>
+            <tr>
+              <td><strong>RMSE 오차 개선율</strong></td>
+              <td>기준 (Baseline)</td>
+              <td><span class="tag-green">71.7% 감소</span></td>
+            </tr>
+            <tr>
+              <td><strong>코너링 주행 특성</strong></td>
+              <td>선회 외측 경로 이탈 발생</td>
+              <td>목표 트랙 중심선 추종</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>4. 핵심 제어 효과 및 결론</h2>
+        <p class="sec-desc">시뮬레이션 및 PIL 검증 결과 요약</p>
+        <ul class="summary-list">
+          <li>
+            <strong>선회 안정성 및 추종성 확보:</strong> 급격한 연속 선회 구간에서 TV OFF 시 발생하는 언더스티어 및 경로 이탈을 외측 휠 구동 토크 증대·내측 휠 감소를 통한 요 모멘트(M<sub>z</sub>) 생성으로 효과적으로 억제했습니다.
+          </li>
+          <li>
+            <strong>정량적 오차 대폭 감소:</strong> 전체 주행 구간 기준 요레이트 추종 RMSE가 <strong>0.4932 rad/s에서 0.1397 rad/s로 71.7% 감소</strong>하여 목표 거동과의 일치도가 크게 향상되었습니다.
+          </li>
+          <li>
+            <strong>임베디드 실시간성 검증:</strong> Arduino Due 하드웨어 타겟 상에서 제어 알고리즘이 지연이나 수치 오차 누적 없이 정상 동작함을 PIL 환경에서 입증했습니다.
+          </li>
+        </ul>
+      </section>
+    </div>
+
+    <footer>
+      Arduino Due PIL 기반 4륜 독립 구동 토크 벡터링 제어 프로젝트 결과 페이지 &nbsp;|&nbsp; Hosted on GitHub Pages
+    </footer>
+  </div>
+
+</body>
+</html>
